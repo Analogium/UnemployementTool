@@ -1,0 +1,243 @@
+{
+  "name": "01 - LinkedIn Job Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Toutes les 4h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://puppeteer-service:3000/linkedin/scrape",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "page", "value": "0" },
+            { "name": "keywords", "value": "developpeur web" }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "scrape-page-0",
+      "name": "Scrape page 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://puppeteer-service:3000/linkedin/scrape",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "page", "value": "1" },
+            { "name": "keywords", "value": "developpeur web" }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "scrape-page-1",
+      "name": "Scrape page 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 460]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "merge-pages",
+      "name": "Fusionner pages",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [680, 380]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "jobs",
+        "options": {}
+      },
+      "id": "split-jobs",
+      "name": "1 item par offre",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [900, 380]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "jobs",
+          "mode": "list"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "linkedin_job_id",
+              "value": "={{ $json.linkedin_job_id }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "options": {}
+      },
+      "id": "check-duplicate",
+      "name": "Déjà en DB ?",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1120, 380],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CRED_ID", "name": "PostgreSQL linkedin_jobs" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "new-job-check",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "empty", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-new-job",
+      "name": "Nouvelle offre ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 380]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": { "__rl": true, "value": "public", "mode": "list" },
+        "table": { "__rl": true, "value": "jobs", "mode": "list" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "linkedin_job_id": "={{ $('1 item par offre').item.json.linkedin_job_id }}",
+            "title": "={{ $('1 item par offre').item.json.title }}",
+            "company": "={{ $('1 item par offre').item.json.company }}",
+            "location": "={{ $('1 item par offre').item.json.location }}",
+            "job_url": "={{ $('1 item par offre').item.json.job_url }}",
+            "apply_type": "={{ $('1 item par offre').item.json.apply_type }}",
+            "status": "pending"
+          }
+        },
+        "options": { "queryBatching": "independently" }
+      },
+      "id": "insert-job",
+      "name": "Insérer en DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1560, 280],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CRED_ID", "name": "PostgreSQL linkedin_jobs" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_URL }}/webhook/linkedin-apply",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "job_id", "value": "={{ $json.id }}" },
+            { "name": "job_url", "value": "={{ $('1 item par offre').item.json.job_url }}" },
+            { "name": "title", "value": "={{ $('1 item par offre').item.json.title }}" },
+            { "name": "company", "value": "={{ $('1 item par offre').item.json.company }}" },
+            { "name": "apply_type", "value": "={{ $('1 item par offre').item.json.apply_type }}" }
+          ]
+        },
+        "options": { "timeout": 5000 }
+      },
+      "id": "trigger-apply",
+      "name": "Déclencher candidature",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 280]
+    },
+    {
+      "parameters": {
+        "content": "## ✅ Doublon — ignoré\nL'offre {{ $json.linkedin_job_id }} est déjà en base.",
+        "height": 80,
+        "width": 280
+      },
+      "id": "skip-note",
+      "name": "Doublon ignoré",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1560, 460]
+    }
+  ],
+  "connections": {
+    "Toutes les 4h": {
+      "main": [
+        [
+          { "node": "Scrape page 1", "type": "main", "index": 0 },
+          { "node": "Scrape page 2", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Scrape page 1": {
+      "main": [[{ "node": "Fusionner pages", "type": "main", "index": 0 }]]
+    },
+    "Scrape page 2": {
+      "main": [[{ "node": "Fusionner pages", "type": "main", "index": 1 }]]
+    },
+    "Fusionner pages": {
+      "main": [[{ "node": "1 item par offre", "type": "main", "index": 0 }]]
+    },
+    "1 item par offre": {
+      "main": [[{ "node": "Déjà en DB ?", "type": "main", "index": 0 }]]
+    },
+    "Déjà en DB ?": {
+      "main": [[{ "node": "Nouvelle offre ?", "type": "main", "index": 0 }]]
+    },
+    "Nouvelle offre ?": {
+      "main": [
+        [{ "node": "Insérer en DB", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Insérer en DB": {
+      "main": [[{ "node": "Déclencher candidature", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "linkedin" }, { "name": "jobs" }]
+}

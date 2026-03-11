@@ -1,0 +1,13 @@
+# PDFs (generated files)
+*.pdf
+
+# Node modules
+node_modules/
+
+# Environment variables
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db

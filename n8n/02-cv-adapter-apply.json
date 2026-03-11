@@ -1,0 +1,372 @@
+{
+  "name": "02 - CV Adapter + Auto Apply",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "linkedin-apply",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook déclencheur",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400],
+      "webhookId": "linkedin-apply"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://puppeteer-service:3000/linkedin/job-details",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "job_url", "value": "={{ $json.body.job_url }}" }
+          ]
+        },
+        "options": { "timeout": 45000, "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "get-job-details",
+      "name": "Récupérer description",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "job_id", "name": "job_id", "value": "={{ $('Webhook déclencheur').item.json.body.job_id }}", "type": "string" },
+            { "id": "job_url", "name": "job_url", "value": "={{ $('Webhook déclencheur').item.json.body.job_url }}", "type": "string" },
+            { "id": "title", "name": "title", "value": "={{ $('Webhook déclencheur').item.json.body.title }}", "type": "string" },
+            { "id": "company", "name": "company", "value": "={{ $('Webhook déclencheur').item.json.body.company }}", "type": "string" },
+            { "id": "apply_type", "name": "apply_type", "value": "={{ $('Webhook déclencheur').item.json.body.apply_type }}", "type": "string" },
+            { "id": "description", "name": "description", "value": "={{ $json.description_text }}", "type": "string" },
+            { "id": "language", "name": "language", "value": "={{ $json.language }}", "type": "string" },
+            { "id": "external_apply_url", "name": "external_apply_url", "value": "={{ $json.external_apply_url }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "merge-data",
+      "name": "Fusionner données",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-opus-4-6\",\n  \"max_tokens\": 2000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Tu es un expert en recrutement. Voici une offre d'emploi et le CV de Theo Lambert.\\n\\n## OFFRE D'EMPLOI\\nPoste : {{ $json.title }}\\nEntreprise : {{ $json.company }}\\nLangue de l'offre : {{ $json.language }}\\n\\nDescription :\\n{{ $json.description.substring(0, 3000) }}\\n\\n## CV ACTUEL (Résumé)\\n{{ $json.language === 'en' ? 'Dynamic web developer with 2 years of solid experience in web application development, including Frontend technologies such as Angular and Vue.js, as well as Backend with NestJS and Python. Expert in relational databases and version control with GitLab, with a DevOps specialization.' : 'Dynamique developpeur web avec une solide experience de 2 ans dans le developpement d applications web, comprenant les technologies Frontend comme Angular et Vue.js ainsi que le Backend avec NestJS et Python. Expert en bases de donnees relationnelles et gestion de version sur GitLab, ainsi qu une specialisation DevOps.' }}\\n\\n## COMPÉTENCES\\nLangages : Java, Python, PHP, TypeScript, JavaScript\\nFrontend : Angular, React, Vue.js, Next.js\\nBackend : Symfony, Node.js, NestJS\\nBDD : MySQL, PostgreSQL, Redis, Elasticsearch\\nDevOps : Docker, GitLab, GitHub, RabbitMQ\\n\\n## TÂCHES\\n1. Rédige un nouveau résumé/accroche CV adapté à CETTE offre (3-4 phrases max), en {{ $json.language === 'en' ? 'anglais' : 'français' }}. Mets en avant les compétences les plus pertinentes pour CE poste spécifiquement.\\n2. Rédige une lettre de motivation courte (5-6 phrases max) pour ce poste, en {{ $json.language === 'en' ? 'anglais' : 'français' }}.\\n\\nRéponds UNIQUEMENT en JSON valide avec cette structure :\\n{\\\"adapted_resume\\\": \\\"...\\\", \\\"cover_note\\\": \\\"...\\\"}\"\n    }\n  ]\n}",
+        "options": { "timeout": 60000, "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "claude-adapt-cv",
+      "name": "Claude - Adapter CV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "parse-claude",
+              "name": "claude_response",
+              "value": "={{ JSON.parse($json.content[0].text) }}",
+              "type": "object"
+            },
+            {
+              "id": "adapted-resume",
+              "name": "adapted_resume",
+              "value": "={{ JSON.parse($json.content[0].text).adapted_resume }}",
+              "type": "string"
+            },
+            {
+              "id": "cover-note",
+              "name": "cover_note",
+              "value": "={{ JSON.parse($json.content[0].text).cover_note }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "parse-claude",
+      "name": "Parser réponse Claude",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "build-html",
+              "name": "cv_html",
+              "value": "=<!DOCTYPE html>\n<html lang=\"{{ $('Fusionner données').item.json.language }}\">\n<head>\n  <meta charset=\"UTF-8\">\n  <style>\n    @page { size: A4; margin: 0; }\n    * { margin: 0; padding: 0; box-sizing: border-box; }\n    body { font-family: Arial, sans-serif; font-size: 12px; line-height: 1.5; }\n    .container { width: 210mm; min-height: 297mm; background: white; }\n    .header { background: #1a4d7a; color: white; padding: 30px 35px; text-align: center; }\n    .name { font-size: 26px; font-weight: 600; margin-bottom: 15px; }\n    .contact-info { font-size: 12px; margin-bottom: 12px; }\n    .contact-item { display: inline-block; margin: 0 12px; }\n    .links-section { font-size: 11px; margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.3); }\n    .link-item { display: inline-block; color: white; text-decoration: none; margin: 5px 10px; padding: 8px 14px; background: rgba(255,255,255,0.15); border-radius: 4px; }\n    .content { padding: 30px 35px; }\n    .section { margin-bottom: 25px; }\n    .section-title { color: #1a4d7a; font-size: 16px; font-weight: 600; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid #1a4d7a; }\n    .section-content { font-size: 12px; color: #333; line-height: 1.6; }\n    .job { margin-bottom: 20px; }\n    .job-title { font-weight: 600; color: #1a4d7a; font-size: 13px; margin-bottom: 4px; }\n    .job-period { color: #666; font-size: 11px; margin-bottom: 8px; }\n    .job ul { margin-left: 18px; margin-top: 8px; }\n    .job li { margin-bottom: 6px; color: #444; }\n    .education-item { margin-bottom: 18px; }\n    .education-title { font-weight: 600; color: #1a4d7a; font-size: 13px; }\n    .education-period { color: #666; font-size: 11px; margin-bottom: 6px; }\n    .education-item ul { margin-left: 18px; margin-top: 6px; }\n    .education-item li { margin-bottom: 4px; color: #444; }\n    .skills-list p { margin-bottom: 4px; }\n    .language-item { display: inline-block; margin-right: 30px; }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <header class=\"header\">\n      <div class=\"name\">Theo Lambert</div>\n      <div class=\"contact-info\">\n        <span class=\"contact-item\">{{ $('Fusionner données').item.json.language === 'en' ? 'Email' : 'Email' }}: lambertheo@gmail.com</span>\n        <span class=\"contact-item\">{{ $('Fusionner données').item.json.language === 'en' ? 'Phone' : 'Téléphone' }}: +33 6 73 78 30 10</span>\n        <span class=\"contact-item\">{{ $('Fusionner données').item.json.language === 'en' ? 'Location' : 'Adresse' }}: Saint-Brieuc, France</span>\n      </div>\n      <div class=\"links-section\">\n        <a class=\"link-item\" href=\"https://linkedin.com/in/theo-lambert-601021f1a0\">LinkedIn</a>\n        <a class=\"link-item\" href=\"https://github.com/Analogium\">GitHub</a>\n        <a class=\"link-item\" href=\"https://theolambert.dev\">Portfolio</a>\n      </div>\n    </header>\n    <div class=\"content\">\n      <section class=\"section\">\n        <h2 class=\"section-title\">{{ $('Fusionner données').item.json.language === 'en' ? 'Summary' : 'Résumé' }}</h2>\n        <div class=\"section-content\">{{ $json.adapted_resume }}</div>\n      </section>\n      <section class=\"section\">\n        <h2 class=\"section-title\">{{ $('Fusionner données').item.json.language === 'en' ? 'Professional Experience' : 'Expérience professionnelle' }}</h2>\n        <div class=\"job\">\n          <div class=\"job-title\">{{ $('Fusionner données').item.json.language === 'en' ? 'Web Developer Consultant (Full Remote) - Astek, Rennes' : 'Consultant Développeur Web Full Remote - Astek, Rennes' }}</div>\n          <div class=\"job-period\">{{ $('Fusionner données').item.json.language === 'en' ? 'October 2024 - March 2025' : 'Octobre 2024 - Mars 2025' }}</div>\n          <ul>\n            <li>{{ $('Fusionner données').item.json.language === 'en' ? 'Supported a modernization initiative, focused on Frontend (Vue 3) and Backend (Symfony) to improve mission experience through the platform.' : 'Soutien une initiative de modernisation sur un projet interne, axé sur le Frontend (Vue 3) et le Backend (Symfony).' }}</li>\n            <li>{{ $('Fusionner données').item.json.language === 'en' ? 'Implemented new features while promoting continuous platform improvement.' : 'Implémentation de nouvelles fonctionnalités tout en favorisant l amélioration continue de la plateforme.' }}</li>\n            <li>{{ $('Fusionner données').item.json.language === 'en' ? 'Collaborated with the team using GitLab for version control and CI/CD, integrating Docker.' : 'Collaboré avec l équipe via GitLab (CI/CD) et Docker.' }}</li>\n          </ul>\n        </div>\n        <div class=\"job\">\n          <div class=\"job-title\">{{ $('Fusionner données').item.json.language === 'en' ? 'Web Developer Apprentice (Full Remote) - Commeett, Caen' : 'Alternant Développeur Web Full Remote - Commeett, Caen' }}</div>\n          <div class=\"job-period\">{{ $('Fusionner données').item.json.language === 'en' ? 'July 2022 - August 2024' : 'Juillet 2022 - Août 2024' }}</div>\n          <ul>\n            <li>{{ $('Fusionner données').item.json.language === 'en' ? 'Contributed to the maintenance and improvement of the web platform, both Frontend and Backend.' : 'Maintien et amélioration de la plateforme web (Frontend et Backend).' }}</li>\n            <li>{{ $('Fusionner données').item.json.language === 'en' ? 'Developed Frontend solutions in Angular (website) and Vue.js (mobile app).' : 'Solutions Frontend en Angular (site web) et Vue.js (application mobile).' }}</li>\n            <li>{{ $('Fusionner données').item.json.language === 'en' ? 'Programmed Backend features in PHP/Symfony.' : 'Développement Backend en PHP/Symfony.' }}</li>\n            <li>{{ $('Fusionner données').item.json.language === 'en' ? 'Used Docker, GitLab and facilitated collaborative teamwork.' : 'Docker, GitLab et travail collaboratif en équipe.' }}</li>\n          </ul>\n        </div>\n      </section>\n      <section class=\"section\">\n        <h2 class=\"section-title\">{{ $('Fusionner données').item.json.language === 'en' ? 'Education' : 'Formation' }}</h2>\n        <div class=\"education-item\">\n          <div class=\"education-title\">{{ $('Fusionner données').item.json.language === 'en' ? 'Master in Web Development - Ynov Rennes' : 'Master Développement Web - Ynov Rennes' }}</div>\n          <div class=\"education-period\">{{ $('Fusionner données').item.json.language === 'en' ? 'October 2022 - September 2024' : 'Octobre 2022 - Septembre 2024' }}</div>\n        </div>\n        <div class=\"education-item\">\n          <div class=\"education-title\">{{ $('Fusionner données').item.json.language === 'en' ? 'Bachelor in Computer Science - University of Caen' : 'Licence Informatique - Université de Caen' }}</div>\n          <div class=\"education-period\">{{ $('Fusionner données').item.json.language === 'en' ? 'September 2019 - June 2022' : 'Septembre 2019 - Juin 2022' }}</div>\n        </div>\n      </section>\n      <section class=\"section\">\n        <h2 class=\"section-title\">{{ $('Fusionner données').item.json.language === 'en' ? 'Technical Skills' : 'Compétences techniques' }}</h2>\n        <div class=\"skills-list\">\n          <p><strong>{{ $('Fusionner données').item.json.language === 'en' ? 'Languages' : 'Langages' }}:</strong> Java, Python, PHP, TypeScript, JavaScript</p>\n          <p><strong>Frontend:</strong> Angular, React, Vue.js, Next.js</p>\n          <p><strong>Backend:</strong> Symfony, Node.js, NestJS</p>\n          <p><strong>{{ $('Fusionner données').item.json.language === 'en' ? 'Databases' : 'Bases de données' }}:</strong> MySQL, PostgreSQL, Redis, Elasticsearch</p>\n          <p><strong>DevOps:</strong> Docker, GitLab, GitHub, RabbitMQ</p>\n        </div>\n      </section>\n      <section class=\"section\">\n        <h2 class=\"section-title\">{{ $('Fusionner données').item.json.language === 'en' ? 'Languages' : 'Langues' }}</h2>\n        <div>\n          <span class=\"language-item\">{{ $('Fusionner données').item.json.language === 'en' ? 'French: Native' : 'Français : Langue maternelle' }}</span>\n          <span class=\"language-item\">{{ $('Fusionner données').item.json.language === 'en' ? 'English: Intermediate (B1/B2)' : 'Anglais : Niveau intermédiaire (B1/B2)' }}</span>\n        </div>\n      </section>\n    </div>\n  </div>\n</body>\n</html>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "build-cv-html",
+      "name": "Construire HTML CV",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://puppeteer-service:3000/linkedin/generate-pdf",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ html: $json.cv_html, filename: 'cv-theo-lambert-' + $('Fusionner données').item.json.language + '-adapted.pdf' }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "responseFormat": "file" } }
+        }
+      },
+      "id": "generate-pdf",
+      "name": "Générer PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "check-easy-apply",
+              "leftValue": "={{ $('Fusionner données').item.json.apply_type }}",
+              "rightValue": "easy_apply",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-apply-type",
+      "name": "Easy Apply ou Externe ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1780, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://puppeteer-service:3000/linkedin/easy-apply",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  job_url: $('Fusionner données').item.json.job_url,\n  job_title: $('Fusionner données').item.json.title,\n  cv_pdf_base64: $('Générer PDF').item.binary?.data?.toString('base64') || '',\n  cover_note: $('Parser réponse Claude').item.json.cover_note\n}) }}",
+        "options": { "timeout": 120000, "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "easy-apply",
+      "name": "Postuler Easy Apply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 280]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://puppeteer-service:3000/linkedin/analyze-form",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "url", "value": "={{ $('Fusionner données').item.json.external_apply_url }}" }
+          ]
+        },
+        "options": { "timeout": 30000, "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "analyze-form",
+      "name": "Analyser formulaire externe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 520]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1500,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Voici les champs d'un formulaire de candidature externe. Pour chaque champ, détermine la valeur à remplir en te basant sur les infos du candidat Theo Lambert.\\n\\nINFOS CANDIDAT :\\n- Prénom: Theo, Nom: Lambert\\n- Email: lambertheo@gmail.com\\n- Téléphone: 0673783010\\n- Localisation: Saint-Brieuc, France\\n- Expérience: 2 ans développeur web\\n- LinkedIn: https://linkedin.com/in/theo-lambert-601021f1a0/\\n- GitHub: https://github.com/Analogium\\n- Portfolio: https://theolambert.dev\\n- Disponible: sous 1 mois\\n- Salaire souhaité: 38000 EUR\\n\\nCHAMPS DU FORMULAIRE :\\n{{ JSON.stringify($json.fields) }}\\n\\nRéponds UNIQUEMENT en JSON valide :\\n{\\\"fields\\\": [{\\\"selector\\\": \\\"...\\\", \\\"label\\\": \\\"...\\\", \\\"value\\\": \\\"...\\\", \\\"tag\\\": \\\"...\\\", \\\"type\\\": \\\"...\\\"}]}\"\n    }\n  ]\n}",
+        "options": { "timeout": 30000, "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "claude-fill-form",
+      "name": "Claude - Analyser champs formulaire",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2220, 520]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://puppeteer-service:3000/linkedin/external-apply",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  external_url: $('Fusionner données').item.json.external_apply_url,\n  job_title: $('Fusionner données').item.json.title,\n  company: $('Fusionner données').item.json.company,\n  cv_pdf_base64: $('Générer PDF').item.binary?.data?.toString('base64') || '',\n  cover_note: $('Parser réponse Claude').item.json.cover_note,\n  form_analysis: JSON.parse($json.content[0].text)\n}) }}",
+        "options": { "timeout": 120000, "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "external-apply",
+      "name": "Postuler formulaire externe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2440, 520]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "merge-apply-results",
+      "name": "Résultat candidature",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [2660, 400]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": { "__rl": true, "value": "public", "mode": "list" },
+        "table": { "__rl": true, "value": "jobs", "mode": "list" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.success ? 'applied' : 'failed' }}",
+            "processed_at": "={{ new Date().toISOString() }}"
+          }
+        },
+        "where": {
+          "values": [{ "column": "id", "value": "={{ $('Fusionner données').item.json.job_id }}" }]
+        },
+        "options": {}
+      },
+      "id": "update-job-status",
+      "name": "Mettre à jour statut job",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2880, 400],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CRED_ID", "name": "PostgreSQL linkedin_jobs" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": { "__rl": true, "value": "public", "mode": "list" },
+        "table": { "__rl": true, "value": "applications", "mode": "list" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "job_id": "={{ $('Fusionner données').item.json.job_id }}",
+            "status": "={{ $('Résultat candidature').item.json.success ? 'sent' : 'error' }}",
+            "cv_language": "={{ $('Fusionner données').item.json.language }}",
+            "adapted_resume": "={{ $('Parser réponse Claude').item.json.adapted_resume }}",
+            "cover_note": "={{ $('Parser réponse Claude').item.json.cover_note }}",
+            "error_message": "={{ $('Résultat candidature').item.json.error || null }}",
+            "screenshot_path": "={{ $('Résultat candidature').item.json.screenshot_path || $('Résultat candidature').item.json.screenshot_after || null }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "save-application",
+      "name": "Sauvegarder candidature",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [3100, 400],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CRED_ID", "name": "PostgreSQL linkedin_jobs" }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 📌 Notification\nAjoute ici un nœud Telegram ou Email\nselon ta préférence.\n\nDonnées disponibles :\n- $('Fusionner données').item.json.title\n- $('Fusionner données').item.json.company\n- $('Résultat candidature').item.json.success\n- $('Parser réponse Claude').item.json.cover_note",
+        "height": 180,
+        "width": 320
+      },
+      "id": "notif-placeholder",
+      "name": "→ Ajouter notification ici",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [3320, 280]
+    }
+  ],
+  "connections": {
+    "Webhook déclencheur": {
+      "main": [[{ "node": "Récupérer description", "type": "main", "index": 0 }]]
+    },
+    "Récupérer description": {
+      "main": [[{ "node": "Fusionner données", "type": "main", "index": 0 }]]
+    },
+    "Fusionner données": {
+      "main": [[{ "node": "Claude - Adapter CV", "type": "main", "index": 0 }]]
+    },
+    "Claude - Adapter CV": {
+      "main": [[{ "node": "Parser réponse Claude", "type": "main", "index": 0 }]]
+    },
+    "Parser réponse Claude": {
+      "main": [[{ "node": "Construire HTML CV", "type": "main", "index": 0 }]]
+    },
+    "Construire HTML CV": {
+      "main": [[{ "node": "Générer PDF", "type": "main", "index": 0 }]]
+    },
+    "Générer PDF": {
+      "main": [[{ "node": "Easy Apply ou Externe ?", "type": "main", "index": 0 }]]
+    },
+    "Easy Apply ou Externe ?": {
+      "main": [
+        [{ "node": "Postuler Easy Apply", "type": "main", "index": 0 }],
+        [{ "node": "Analyser formulaire externe", "type": "main", "index": 0 }]
+      ]
+    },
+    "Postuler Easy Apply": {
+      "main": [[{ "node": "Résultat candidature", "type": "main", "index": 0 }]]
+    },
+    "Analyser formulaire externe": {
+      "main": [[{ "node": "Claude - Analyser champs formulaire", "type": "main", "index": 0 }]]
+    },
+    "Claude - Analyser champs formulaire": {
+      "main": [[{ "node": "Postuler formulaire externe", "type": "main", "index": 0 }]]
+    },
+    "Postuler formulaire externe": {
+      "main": [[{ "node": "Résultat candidature", "type": "main", "index": 1 }]]
+    },
+    "Résultat candidature": {
+      "main": [[{ "node": "Mettre à jour statut job", "type": "main", "index": 0 }]]
+    },
+    "Mettre à jour statut job": {
+      "main": [[{ "node": "Sauvegarder candidature", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "linkedin" }, { "name": "jobs" }, { "name": "cv" }]
+}
