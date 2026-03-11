@@ -16,7 +16,10 @@
       "name": "Toutes les 4h",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
@@ -25,20 +28,33 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "page", "value": "0" },
-            { "name": "keywords", "value": "developpeur web" }
+            {
+              "name": "page",
+              "value": "0"
+            },
+            {
+              "name": "keywords",
+              "value": "developpeur web"
+            }
           ]
         },
         "options": {
           "timeout": 60000,
-          "response": { "response": { "responseFormat": "json" } }
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
         }
       },
       "id": "scrape-page-0",
       "name": "Scrape page 1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 300]
+      "position": [
+        460,
+        300
+      ]
     },
     {
       "parameters": {
@@ -47,20 +63,33 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "page", "value": "1" },
-            { "name": "keywords", "value": "developpeur web" }
+            {
+              "name": "page",
+              "value": "1"
+            },
+            {
+              "name": "keywords",
+              "value": "developpeur web"
+            }
           ]
         },
         "options": {
           "timeout": 60000,
-          "response": { "response": { "responseFormat": "json" } }
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
         }
       },
       "id": "scrape-page-1",
       "name": "Scrape page 2",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 460]
+      "position": [
+        460,
+        460
+      ]
     },
     {
       "parameters": {
@@ -72,7 +101,10 @@
       "name": "Fusionner pages",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2.1,
-      "position": [680, 380]
+      "position": [
+        680,
+        380
+      ]
     },
     {
       "parameters": {
@@ -83,51 +115,50 @@
       "name": "1 item par offre",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [900, 380]
+      "position": [
+        900,
+        380
+      ]
     },
     {
       "parameters": {
-        "operation": "select",
-        "schema": {
-          "__rl": true,
-          "value": "public",
-          "mode": "list"
-        },
-        "table": {
-          "__rl": true,
-          "value": "jobs",
-          "mode": "list"
-        },
-        "where": {
-          "values": [
-            {
-              "column": "linkedin_job_id",
-              "value": "={{ $json.linkedin_job_id }}"
-            }
-          ]
-        },
-        "limit": 1,
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE((SELECT id FROM jobs WHERE linkedin_job_id = '{{ $json.linkedin_job_id }}'), NULL) as id, '{{ $json.linkedin_job_id }}' as linkedin_job_id",
         "options": {}
       },
       "id": "check-duplicate",
       "name": "Déjà en DB ?",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1120, 380],
+      "position": [
+        1120,
+        380
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CRED_ID", "name": "PostgreSQL linkedin_jobs" }
+        "postgres": {
+          "id": "POSTGRES_CRED_ID",
+          "name": "PostgreSQL linkedin_jobs"
+        }
       }
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "new-job-check",
               "leftValue": "={{ $json.id }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "empty", "singleValue": true }
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -138,13 +169,24 @@
       "name": "Nouvelle offre ?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1340, 380]
+      "position": [
+        1340,
+        380
+      ]
     },
     {
       "parameters": {
         "operation": "insert",
-        "schema": { "__rl": true, "value": "public", "mode": "list" },
-        "table": { "__rl": true, "value": "jobs", "mode": "list" },
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "jobs",
+          "mode": "list"
+        },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
@@ -157,15 +199,23 @@
             "status": "pending"
           }
         },
-        "options": { "queryBatching": "independently" }
+        "options": {
+          "queryBatching": "independently"
+        }
       },
       "id": "insert-job",
       "name": "Insérer en DB",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1560, 280],
+      "position": [
+        1560,
+        280
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CRED_ID", "name": "PostgreSQL linkedin_jobs" }
+        "postgres": {
+          "id": "POSTGRES_CRED_ID",
+          "name": "PostgreSQL linkedin_jobs"
+        }
       }
     },
     {
@@ -175,20 +225,40 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "job_id", "value": "={{ $json.id }}" },
-            { "name": "job_url", "value": "={{ $('1 item par offre').item.json.job_url }}" },
-            { "name": "title", "value": "={{ $('1 item par offre').item.json.title }}" },
-            { "name": "company", "value": "={{ $('1 item par offre').item.json.company }}" },
-            { "name": "apply_type", "value": "={{ $('1 item par offre').item.json.apply_type }}" }
+            {
+              "name": "job_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "job_url",
+              "value": "={{ $('1 item par offre').item.json.job_url }}"
+            },
+            {
+              "name": "title",
+              "value": "={{ $('1 item par offre').item.json.title }}"
+            },
+            {
+              "name": "company",
+              "value": "={{ $('1 item par offre').item.json.company }}"
+            },
+            {
+              "name": "apply_type",
+              "value": "={{ $('1 item par offre').item.json.apply_type }}"
+            }
           ]
         },
-        "options": { "timeout": 5000 }
+        "options": {
+          "timeout": 5000
+        }
       },
       "id": "trigger-apply",
       "name": "Déclencher candidature",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1780, 280]
+      "position": [
+        1780,
+        280
+      ]
     },
     {
       "parameters": {
@@ -200,44 +270,118 @@
       "name": "Doublon ignoré",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [1560, 460]
+      "position": [
+        1560,
+        460
+      ]
     }
   ],
   "connections": {
     "Toutes les 4h": {
       "main": [
         [
-          { "node": "Scrape page 1", "type": "main", "index": 0 },
-          { "node": "Scrape page 2", "type": "main", "index": 0 }
+          {
+            "node": "Scrape page 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Scrape page 2",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Scrape page 1": {
-      "main": [[{ "node": "Fusionner pages", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fusionner pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Scrape page 2": {
-      "main": [[{ "node": "Fusionner pages", "type": "main", "index": 1 }]]
+      "main": [
+        [
+          {
+            "node": "Fusionner pages",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
     },
     "Fusionner pages": {
-      "main": [[{ "node": "1 item par offre", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "1 item par offre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "1 item par offre": {
-      "main": [[{ "node": "Déjà en DB ?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Déjà en DB ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Déjà en DB ?": {
-      "main": [[{ "node": "Nouvelle offre ?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Nouvelle offre ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Nouvelle offre ?": {
       "main": [
-        [{ "node": "Insérer en DB", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Insérer en DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Insérer en DB": {
-      "main": [[{ "node": "Déclencher candidature", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Déclencher candidature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "linkedin" }, { "name": "jobs" }]
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "linkedin"
+    },
+    {
+      "name": "jobs"
+    }
+  ]
 }
