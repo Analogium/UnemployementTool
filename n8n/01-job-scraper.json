@@ -176,31 +176,11 @@
     },
     {
       "parameters": {
-        "operation": "insert",
-        "schema": {
-          "__rl": true,
-          "value": "public",
-          "mode": "list"
-        },
-        "table": {
-          "__rl": true,
-          "value": "jobs",
-          "mode": "list"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "linkedin_job_id": "={{ $('1 item par offre').item.json.linkedin_job_id }}",
-            "title": "={{ $('1 item par offre').item.json.title }}",
-            "company": "={{ $('1 item par offre').item.json.company }}",
-            "location": "={{ $('1 item par offre').item.json.location }}",
-            "job_url": "={{ $('1 item par offre').item.json.job_url }}",
-            "apply_type": "={{ $('1 item par offre').item.json.apply_type }}",
-            "status": "pending"
-          }
-        },
+        "operation": "executeQuery",
+        "query": "INSERT INTO jobs (linkedin_job_id, title, company, location, job_url, apply_type, status) VALUES ($1, $2, $3, $4, $5, $6, 'pending') ON CONFLICT (linkedin_job_id) DO NOTHING RETURNING id",
         "options": {
-          "queryBatching": "independently"
+          "queryBatching": "independently",
+          "queryReplacement": "={{ $('1 item par offre').item.json.linkedin_job_id }},={{ $('1 item par offre').item.json.title }},={{ $('1 item par offre').item.json.company }},={{ $('1 item par offre').item.json.location }},={{ $('1 item par offre').item.json.job_url }},={{ $('1 item par offre').item.json.apply_type }}"
         }
       },
       "id": "insert-job",
