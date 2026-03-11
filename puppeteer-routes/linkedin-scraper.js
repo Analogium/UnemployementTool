@@ -12,8 +12,7 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 
-// Cookie de session LinkedIn (li_at) — injecté via variable d'env
-const LI_AT_COOKIE = process.env.LINKEDIN_LI_AT_COOKIE;
+const { injectSession } = require('./linkedin-session');
 
 // Paramètres de recherche LinkedIn
 const SEARCH_CONFIG = {
@@ -36,24 +35,9 @@ router.post('/scrape', async (req, res) => {
 
   try {
     browser = await getBrowser();
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      locale: 'fr-FR',
-    });
-
-    // Injection du cookie de session LinkedIn
-    await context.addCookies([
-      {
-        name: 'li_at',
-        value: LI_AT_COOKIE,
-        domain: '.linkedin.com',
-        path: '/',
-        httpOnly: true,
-        secure: true,
-      }
-    ]);
-
-    const pageObj = await context.newPage();
+    const pageObj = await browser.newPage();
+    await pageObj.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    // Pas de cookie pour le scraping — la page publique est plus stable
 
     // Construction de l'URL de recherche
     const searchParams = new URLSearchParams({
@@ -68,28 +52,15 @@ router.post('/scrape', async (req, res) => {
 
     const searchUrl = `https://www.linkedin.com/jobs/search/?${searchParams.toString()}`;
 
-    await pageObj.goto(searchUrl, { waitUntil: 'networkidle', timeout: 30000 });
+    await pageObj.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // Vérification de session valide
-    const isLoggedIn = await pageObj.evaluate(() => {
-      return !document.querySelector('.authwall-join-form');
-    });
-
-    if (!isLoggedIn) {
-      await browser.close();
-      return res.status(401).json({ error: 'Session LinkedIn expirée. Mettre à jour le cookie li_at.' });
-    }
-
-    // Attente du chargement des offres
-    await pageObj.waitForSelector('.jobs-search__results-list, .scaffold-layout__list-container', {
-      timeout: 15000,
-    }).catch(() => null);
+    // Attente du chargement des offres (LinkedIn rend les cards via JS)
+    await pageObj.waitForSelector('.base-card, .job-search-card', { timeout: 15000 }).catch(() => null);
+    await pageObj.waitForTimeout(2000);
 
     // Extraction des offres
     const jobs = await pageObj.evaluate(() => {
-      const jobCards = document.querySelectorAll(
-        '.jobs-search__results-list li, .scaffold-layout__list-container li'
-      );
+      const jobCards = document.querySelectorAll('.base-card, .job-search-card');
 
       return Array.from(jobCards).map(card => {
         const titleEl = card.querySelector('.base-search-card__title, .job-card-list__title');
@@ -101,7 +72,7 @@ router.post('/scrape', async (req, res) => {
 
         // Extraction de l'ID LinkedIn depuis l'URL
         const href = linkEl?.href || '';
-        const jobIdMatch = href.match(/\/jobs\/view\/(\d+)/);
+        const jobIdMatch = href.match(/\/jobs\/view\/[^?]*?(\d+)(?:[?&]|$)/);
         const jobId = jobIdMatch ? jobIdMatch[1] : null;
 
         return {
@@ -151,56 +122,53 @@ router.post('/job-details', async (req, res) => {
   let browser = null;
   try {
     browser = await getBrowser();
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      locale: 'fr-FR',
-    });
+    const pageObj = await browser.newPage();
+    await pageObj.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await injectSession(pageObj);
+    await pageObj.goto(job_url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    await context.addCookies([{
-      name: 'li_at', value: LI_AT_COOKIE,
-      domain: '.linkedin.com', path: '/', httpOnly: true, secure: true,
-    }]);
-
-    const pageObj = await context.newPage();
-    await pageObj.goto(job_url, { waitUntil: 'networkidle', timeout: 30000 });
-
-    await pageObj.waitForSelector('.job-view-layout, .jobs-details', { timeout: 15000 }).catch(() => null);
+    await new Promise(r => setTimeout(r, 4000));
 
     const details = await pageObj.evaluate(() => {
-      const descEl = document.querySelector('.jobs-description-content__text, .job-details-jobs-unified-top-card__job-insight');
-      const fullDescEl = document.querySelector('.jobs-box__html-content, .jobs-description__content');
+      const bodyText = document.body.innerText || '';
 
-      // Détection langue (cherche mots-clés anglais dans le titre/description)
-      const titleEl = document.querySelector('.job-details-jobs-unified-top-card__job-title, .jobs-unified-top-card__job-title');
-      const titleText = titleEl?.textContent?.trim() || '';
-      const descText = fullDescEl?.textContent || '';
-      const isEnglish = /\b(developer|engineer|experience|required|skills|team|work)\b/i.test(descText);
+      // Titre : sélecteurs publics d'abord, puis page title
+      const titleEl = document.querySelector('h1, .top-card-layout__title, .topcard__title');
+      const titleText = titleEl?.textContent?.trim()
+        || document.title.split('|')[0].trim()
+        || '';
 
-      // Type de contrat
-      const metaItems = Array.from(document.querySelectorAll('.job-details-jobs-unified-top-card__job-insight, .jobs-unified-top-card__job-insight'));
-      const contractInfo = metaItems.map(el => el.textContent?.trim()).join(' | ');
-
-      // Bouton candidature
-      const easyApplyBtn = document.querySelector('.jobs-apply-button--top-card button');
-      const applyType = easyApplyBtn?.textContent?.includes('Candidature simplifiée') ||
-                        easyApplyBtn?.textContent?.includes('Easy Apply')
-                        ? 'easy_apply' : 'external';
-
-      // URL externe si applicable
-      let externalUrl = null;
-      if (applyType === 'external') {
-        const externalLink = document.querySelector('a[href*="apply"], .jobs-apply-button a');
-        externalUrl = externalLink?.href || null;
+      // Description : sélecteurs publics d'abord, puis fallback sur le body
+      const fullDescEl = document.querySelector('.description__text, .show-more-less-html__markup');
+      let descText = fullDescEl?.textContent?.trim() || '';
+      if (descText.length < 100) {
+        // Vue connectée : extraire le contenu après le titre et les infos du poste
+        const lines = bodyText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        const startIdx = lines.findIndex(l => l.includes('personnes ont cliqué') || l.includes('people clicked'));
+        descText = lines.slice(startIdx > 0 ? startIdx + 1 : 20).join('\n').substring(0, 3000);
       }
+
+      // Critères
+      const criteriaItems = Array.from(document.querySelectorAll('.description__job-criteria-item'));
+      const contractInfo = criteriaItems.map(el => el.textContent?.replace(/\s+/g, ' ').trim()).join(' | ');
+
+      // Détection Easy Apply via texte des boutons (fonctionne en vue connectée)
+      const allBtnTexts = Array.from(document.querySelectorAll('button')).map(el => el.textContent?.trim() || '');
+      const isEasyApply = allBtnTexts.some(t =>
+        t.includes('Candidature simplifiée') || t.includes('Easy Apply')
+      );
+      const applyType = isEasyApply ? 'easy_apply' : 'external';
+
+      const isEnglish = /\b(developer|engineer|experience|required|skills|team|work)\b/i.test(descText);
 
       return {
         title: titleText,
         description: fullDescEl?.innerHTML?.trim() || descText,
-        description_text: descText.trim(),
+        description_text: descText.substring(0, 3000),
         language: isEnglish ? 'en' : 'fr',
         contract_info: contractInfo,
         apply_type: applyType,
-        external_apply_url: externalUrl,
+        external_apply_url: null,
       };
     });
 
@@ -227,10 +195,9 @@ router.post('/generate-pdf', async (req, res) => {
   let browser = null;
   try {
     browser = await getBrowser();
-    const context = await browser.newContext();
-    const pageObj = await context.newPage();
+    const pageObj = await browser.newPage();
 
-    await pageObj.setContent(html, { waitUntil: 'networkidle' });
+    await pageObj.setContent(html, { waitUntil: 'domcontentloaded' });
 
     const pdfBuffer = await pageObj.pdf({
       format: 'A4',
@@ -252,22 +219,22 @@ router.post('/generate-pdf', async (req, res) => {
 
 // Helper : récupère l'instance browser (Playwright ou Puppeteer selon le service existant)
 async function getBrowser() {
-  // Adapter selon l'implémentation du puppeteer-service existant
-  // Si Playwright :
-  try {
-    const { chromium } = require('playwright');
-    return await chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-  } catch {
-    // Si Puppeteer :
-    const puppeteer = require('puppeteer');
-    return await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-  }
+  const puppeteer = require('puppeteer-extra');
+  const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+  puppeteer.use(StealthPlugin());
+  return await puppeteer.launch({
+    headless: 'new',
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-blink-features=AutomationControlled',
+      '--window-size=1920,1080',
+    ],
+  });
 }
+
 
 module.exports = router;

@@ -12,8 +12,8 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 
-const LI_AT_COOKIE = process.env.LINKEDIN_LI_AT_COOKIE;
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || '/tmp/screenshots';
+const { injectSession } = require('./linkedin-session');
 
 // Données personnelles pour remplir les formulaires
 const APPLICANT_INFO = {
@@ -55,18 +55,10 @@ router.post('/easy-apply', async (req, res) => {
     fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
     browser = await getBrowser();
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      locale: 'fr-FR',
-    });
-
-    await context.addCookies([{
-      name: 'li_at', value: LI_AT_COOKIE,
-      domain: '.linkedin.com', path: '/', httpOnly: true, secure: true,
-    }]);
-
-    const pageObj = await context.newPage();
-    await pageObj.goto(job_url, { waitUntil: 'networkidle', timeout: 30000 });
+    const pageObj = await browser.newPage();
+    await pageObj.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await injectSession(pageObj);
+    await pageObj.goto(job_url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // Clic sur le bouton Easy Apply
     const applyBtn = await pageObj.waitForSelector(
@@ -191,13 +183,9 @@ router.post('/external-apply', async (req, res) => {
     fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
     browser = await getBrowser();
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      locale: 'fr-FR',
-    });
-
-    const pageObj = await context.newPage();
-    await pageObj.goto(external_url, { waitUntil: 'networkidle', timeout: 30000 });
+    const pageObj = await browser.newPage();
+    await pageObj.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    await pageObj.goto(external_url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // Remplissage basé sur l'analyse de Claude (form_analysis)
     if (form_analysis && form_analysis.fields) {
@@ -280,9 +268,12 @@ router.post('/analyze-form', async (req, res) => {
   let browser = null;
   try {
     browser = await getBrowser();
-    const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' });
-    const pageObj = await context.newPage();
-    await pageObj.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+    const pageObj = await browser.newPage();
+    await pageObj.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await pageObj.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    // Attendre le rendu JS des formulaires SPA
+    await pageObj.waitForSelector('input, textarea, select', { timeout: 10000 }).catch(() => null);
+    await pageObj.waitForTimeout(2000);
 
     const formData = await pageObj.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll('input, textarea, select'));
@@ -401,13 +392,22 @@ async function fillField(pageObj, field) {
 }
 
 async function getBrowser() {
-  try {
-    const { chromium } = require('playwright');
-    return await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-  } catch {
-    const puppeteer = require('puppeteer');
-    return await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-  }
+  const puppeteer = require('puppeteer-extra');
+  const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+  puppeteer.use(StealthPlugin());
+  return await puppeteer.launch({
+    headless: 'new',
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-blink-features=AutomationControlled',
+      '--window-size=1920,1080',
+    ],
+  });
 }
+
 
 module.exports = router;
