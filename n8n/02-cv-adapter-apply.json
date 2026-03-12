@@ -16,20 +16,20 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://puppeteer-service:3000/linkedin/job-details",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            { "name": "job_url", "value": "={{ $json.body.job_url }}" }
+        "assignments": {
+          "assignments": [
+            { "id": "desc", "name": "description_text", "value": "={{ $json.body.title + ' chez ' + $json.body.company }}", "type": "string" },
+            { "id": "lang", "name": "language", "value": "fr", "type": "string" },
+            { "id": "ext_url", "name": "external_apply_url", "value": "", "type": "string" },
+            { "id": "atype", "name": "apply_type", "value": "={{ $json.body.apply_type }}", "type": "string" }
           ]
         },
-        "options": { "timeout": 150000, "response": { "response": { "responseFormat": "json" } } }
+        "options": {}
       },
       "id": "get-job-details",
       "name": "Récupérer description",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [460, 400]
     },
     {
