@@ -193,6 +193,7 @@
       "name": "Analyser formulaire externe",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
+      "continueOnFail": true,
       "position": [2000, 520]
     },
     {
@@ -215,6 +216,7 @@
       "name": "Claude - Analyser champs formulaire",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
+      "continueOnFail": true,
       "position": [2220, 520]
     },
     {
@@ -230,6 +232,7 @@
       "name": "Postuler formulaire externe",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
+      "continueOnFail": true,
       "position": [2440, 520]
     },
     {
