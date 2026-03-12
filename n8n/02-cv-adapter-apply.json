@@ -60,24 +60,13 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.groq.com/openai/v1/chat/completions",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env.GROQ_API_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"max_tokens\": 2000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Tu es un expert en recrutement. Voici une offre d'emploi et le CV de Theo Lambert.\\n\\n## OFFRE D'EMPLOI\\nPoste : {{ $json.title }}\\nEntreprise : {{ $json.company }}\\nLangue de l'offre : {{ $json.language }}\\n\\nDescription :\\n{{ $json.description }}\\n\\n## CV ACTUEL (Résumé)\\n{{ $json.language === 'en' ? 'Dynamic web developer with 2 years of solid experience in web application development, including Frontend technologies such as Angular and Vue.js, as well as Backend with NestJS and Python. Expert in relational databases and version control with GitLab, with a DevOps specialization.' : 'Dynamique developpeur web avec une solide experience de 2 ans dans le developpement d applications web, comprenant les technologies Frontend comme Angular et Vue.js ainsi que le Backend avec NestJS et Python. Expert en bases de donnees relationnelles et gestion de version sur GitLab, ainsi qu une specialisation DevOps.' }}\\n\\n## COMPETENCES\\nLangages : Java, Python, PHP, TypeScript, JavaScript\\nFrontend : Angular, React, Vue.js, Next.js\\nBackend : Symfony, Node.js, NestJS\\nBDD : MySQL, PostgreSQL, Redis, Elasticsearch\\nDevOps : Docker, GitLab, GitHub, RabbitMQ\\n\\n## TACHES\\n1. Redige un nouveau resume/accroche CV adapte a CETTE offre (3-4 phrases max), en {{ $json.language === 'en' ? 'anglais' : 'francais' }}. Mets en avant les competences les plus pertinentes pour CE poste.\\n2. Redige une lettre de motivation courte (5-6 phrases max) pour ce poste, en {{ $json.language === 'en' ? 'anglais' : 'francais' }}.\\n\\nReponds UNIQUEMENT en JSON valide avec cette structure :\\n{\\\"adapted_resume\\\": \\\"...\\\", \\\"cover_note\\\": \\\"...\\\"}\"\n    }\n  ]\n}",
-        "options": { "timeout": 30000, "response": { "response": { "responseFormat": "json" } } }
+        "language": "javaScript",
+        "jsCode": "const data = $input.first().json;\nconst langFr = data.language !== 'en';\nconst resumeText = langFr\n  ? 'Dynamique developpeur web avec une solide experience de 2 ans dans le developpement d applications web, comprenant les technologies Frontend comme Angular et Vue.js ainsi que le Backend avec NestJS et Python. Expert en bases de donnees relationnelles et gestion de version sur GitLab, ainsi qu une specialisation DevOps.'\n  : 'Dynamic web developer with 2 years of solid experience in web application development, including Frontend technologies such as Angular and Vue.js, as well as Backend with NestJS and Python. Expert in relational databases and version control with GitLab, with a DevOps specialization.';\n\nconst prompt = `Tu es un expert en recrutement. Voici une offre d'emploi et le CV de Theo Lambert.\\n\\n## OFFRE D'EMPLOI\\nPoste : ${data.title}\\nEntreprise : ${data.company}\\nLangue de l'offre : ${data.language}\\n\\nDescription :\\n${data.description}\\n\\n## CV ACTUEL (Résumé)\\n${resumeText}\\n\\n## COMPETENCES\\nLangages : Java, Python, PHP, TypeScript, JavaScript\\nFrontend : Angular, React, Vue.js, Next.js\\nBackend : Symfony, Node.js, NestJS\\nBDD : MySQL, PostgreSQL, Redis, Elasticsearch\\nDevOps : Docker, GitLab, GitHub, RabbitMQ\\n\\n## TACHES\\n1. Redige un nouveau resume/accroche CV adapte a CETTE offre (3-4 phrases max), en ${langFr ? 'francais' : 'anglais'}. Mets en avant les competences les plus pertinentes pour CE poste.\\n2. Redige une lettre de motivation courte (5-6 phrases max) pour ce poste, en ${langFr ? 'francais' : 'anglais'}.\\n\\nReponds UNIQUEMENT en JSON valide avec cette structure :\\n{\"adapted_resume\": \"...\", \"cover_note\": \"...\"}`;\n\nconst apis = [\n  { url: 'https://api.groq.com/openai/v1/chat/completions', key: $env.GROQ_API_KEY, model: 'llama-3.3-70b-versatile' },\n  { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', key: $env.GEMINI_API_KEY, model: 'gemini-2.0-flash' },\n];\n\nfor (const api of apis) {\n  if (!api.key) continue;\n  try {\n    const resp = await fetch(api.url, {\n      method: 'POST',\n      headers: { 'Authorization': `Bearer ${api.key}`, 'Content-Type': 'application/json' },\n      body: JSON.stringify({ model: api.model, max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })\n    });\n    const result = await resp.json();\n    if (!resp.ok) {\n      const s = JSON.stringify(result);\n      if (resp.status === 429 || s.includes('quota') || s.includes('rate_limit') || s.includes('insufficient') || s.includes('limit')) {\n        continue;\n      }\n      throw new Error(s);\n    }\n    return [{ json: result }];\n  } catch(e) {\n    continue;\n  }\n}\nthrow new Error('All LLM APIs exhausted');"
       },
       "id": "claude-adapt-cv",
       "name": "Claude - Adapter CV",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [900, 400]
     },
     {
@@ -202,24 +191,13 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.groq.com/openai/v1/chat/completions",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env.GROQ_API_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"max_tokens\": 1500,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Voici les champs d'un formulaire de candidature externe. Pour chaque champ, détermine la valeur à remplir en te basant sur les infos du candidat Theo Lambert.\\n\\nINFOS CANDIDAT :\\n- Prénom: Theo, Nom: Lambert\\n- Email: lambertheo@gmail.com\\n- Téléphone: 0673783010\\n- Localisation: Saint-Brieuc, France\\n- Expérience: 2 ans développeur web\\n- LinkedIn: https://linkedin.com/in/theo-lambert-601021f1a0/\\n- GitHub: https://github.com/Analogium\\n- Portfolio: https://theolambert.dev\\n- Disponible: sous 1 mois\\n- Salaire souhaité: 38000 EUR\\n\\nCHAMPS DU FORMULAIRE :\\n{{ JSON.stringify($json.fields) }}\\n\\nRéponds UNIQUEMENT en JSON valide :\\n{\\\"fields\\\": [{\\\"selector\\\": \\\"...\\\", \\\"label\\\": \\\"...\\\", \\\"value\\\": \\\"...\\\", \\\"tag\\\": \\\"...\\\", \\\"type\\\": \\\"...\\\"}]}\"\n    }\n  ]\n}",
-        "options": { "timeout": 30000, "response": { "response": { "responseFormat": "json" } } }
+        "language": "javaScript",
+        "jsCode": "const data = $input.first().json;\n\n// Si pas de champs (erreur upstream), retourner vide\nif (!data.fields || data.error) {\n  return [{ json: { choices: [{ message: { content: '{\"fields\": []}' } }] } }];\n}\n\nconst prompt = `Voici les champs d'un formulaire de candidature externe. Pour chaque champ, détermine la valeur à remplir en te basant sur les infos du candidat Theo Lambert.\\n\\nINFOS CANDIDAT :\\n- Prénom: Theo, Nom: Lambert\\n- Email: lambertheo@gmail.com\\n- Téléphone: 0673783010\\n- Localisation: Saint-Brieuc, France\\n- Expérience: 2 ans développeur web\\n- LinkedIn: https://linkedin.com/in/theo-lambert-601021f1a0/\\n- GitHub: https://github.com/Analogium\\n- Portfolio: https://theolambert.dev\\n- Disponible: sous 1 mois\\n- Salaire souhaité: 38000 EUR\\n\\nCHAMPS DU FORMULAIRE :\\n${JSON.stringify(data.fields)}\\n\\nRéponds UNIQUEMENT en JSON valide :\\n{\"fields\": [{\"selector\": \"...\", \"label\": \"...\", \"value\": \"...\", \"tag\": \"...\", \"type\": \"...\"}]}`;\n\nconst apis = [\n  { url: 'https://api.groq.com/openai/v1/chat/completions', key: $env.GROQ_API_KEY, model: 'llama-3.3-70b-versatile' },\n  { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', key: $env.GEMINI_API_KEY, model: 'gemini-2.0-flash' },\n];\n\nfor (const api of apis) {\n  if (!api.key) continue;\n  try {\n    const resp = await fetch(api.url, {\n      method: 'POST',\n      headers: { 'Authorization': `Bearer ${api.key}`, 'Content-Type': 'application/json' },\n      body: JSON.stringify({ model: api.model, max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })\n    });\n    const result = await resp.json();\n    if (!resp.ok) {\n      const s = JSON.stringify(result);\n      if (resp.status === 429 || s.includes('quota') || s.includes('rate_limit') || s.includes('insufficient') || s.includes('limit')) {\n        continue;\n      }\n      throw new Error(s);\n    }\n    return [{ json: result }];\n  } catch(e) {\n    continue;\n  }\n}\nthrow new Error('All LLM APIs exhausted');"
       },
       "id": "claude-fill-form",
       "name": "Claude - Analyser champs formulaire",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "continueOnFail": true,
       "position": [2220, 520]
     },
