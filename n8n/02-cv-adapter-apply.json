@@ -249,20 +249,11 @@
     },
     {
       "parameters": {
-        "operation": "update",
-        "schema": { "__rl": true, "value": "public", "mode": "list" },
-        "table": { "__rl": true, "value": "jobs", "mode": "list" },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "status": "={{ $json.success ? 'applied' : 'failed' }}",
-            "processed_at": "={{ new Date().toISOString() }}"
-          }
-        },
-        "where": {
-          "values": [{ "column": "id", "value": "={{ $('Fusionner données').item.json.job_id }}" }]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "UPDATE jobs SET status = $1, processed_at = NOW() WHERE id = $2 AND id > 0",
+        "options": {
+          "queryReplacement": "={{ $json.success ? 'applied' : 'failed' }},={{ $('Fusionner données').item.json.job_id }}"
+        }
       },
       "id": "update-job-status",
       "name": "Mettre à jour statut job",
