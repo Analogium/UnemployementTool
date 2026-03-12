@@ -130,7 +130,7 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ html: $json.cv_html, filename: 'cv-theo-lambert-' + $('Fusionner données').item.json.language + '-adapted.pdf' }) }}",
         "options": {
-          "timeout": 30000,
+          "timeout": 60000,
           "response": { "response": { "responseFormat": "file" } }
         }
       },
