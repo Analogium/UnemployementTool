@@ -201,7 +201,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.N8N_WEBHOOK_URL }}/webhook/linkedin-apply",
+        "url": "http://n8n:5678/webhook/linkedin-apply",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [

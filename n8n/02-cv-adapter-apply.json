@@ -280,22 +280,11 @@
     },
     {
       "parameters": {
-        "operation": "insert",
-        "schema": { "__rl": true, "value": "public", "mode": "list" },
-        "table": { "__rl": true, "value": "applications", "mode": "list" },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "job_id": "={{ $('Fusionner données').item.json.job_id }}",
-            "status": "={{ $('Résultat candidature').item.json.success ? 'sent' : 'error' }}",
-            "cv_language": "={{ $('Fusionner données').item.json.language }}",
-            "adapted_resume": "={{ $('Parser réponse Claude').item.json.adapted_resume }}",
-            "cover_note": "={{ $('Parser réponse Claude').item.json.cover_note }}",
-            "error_message": "={{ $('Résultat candidature').item.json.error || null }}",
-            "screenshot_path": "={{ $('Résultat candidature').item.json.screenshot_path || $('Résultat candidature').item.json.screenshot_after || null }}"
-          }
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO applications (job_id, status, cv_language, adapted_resume, cover_note, error_message, screenshot_path) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        "options": {
+          "queryReplacement": "={{ $('Fusionner données').item.json.job_id }},={{ $('Résultat candidature').item.json.success ? 'sent' : 'error' }},={{ $('Fusionner données').item.json.language }},={{ $('Parser réponse Claude').item.json.adapted_resume }},={{ $('Parser réponse Claude').item.json.cover_note }},={{ $('Résultat candidature').item.json.error || '' }},={{ $('Résultat candidature').item.json.screenshot_path || $('Résultat candidature').item.json.screenshot_after || '' }}"
+        }
       },
       "id": "save-application",
       "name": "Sauvegarder candidature",
