@@ -229,7 +229,7 @@
         "url": "http://puppeteer-service:3000/linkedin/external-apply",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  external_url: $('Fusionner données').item.json.external_apply_url,\n  job_title: $('Fusionner données').item.json.title,\n  company: $('Fusionner données').item.json.company,\n  cv_pdf_base64: $('Générer PDF').item.binary?.data?.toString('base64') || '',\n  cover_note: $('Parser réponse Claude').item.json.cover_note,\n  form_analysis: JSON.parse($json.choices[0].message.content)\n}) }}",
+        "jsonBody": "={{ JSON.stringify({\n  external_url: $('Fusionner données').item.json.external_apply_url,\n  job_title: $('Fusionner données').item.json.title,\n  company: $('Fusionner données').item.json.company,\n  cv_pdf_base64: $('Générer PDF').item.binary?.data?.toString('base64') || '',\n  cover_note: $('Parser réponse Claude').item.json.cover_note,\n  form_analysis: $json.choices ? JSON.parse($json.choices[0].message.content) : {}\n}) }}",
         "options": { "timeout": 120000, "response": { "response": { "responseFormat": "json" } } }
       },
       "id": "external-apply",
