@@ -57,19 +57,18 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            { "name": "Authorization", "value": "=Bearer {{ $env.GROQ_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-opus-4-6\",\n  \"max_tokens\": 2000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Tu es un expert en recrutement. Voici une offre d'emploi et le CV de Theo Lambert.\\n\\n## OFFRE D'EMPLOI\\nPoste : {{ $json.title }}\\nEntreprise : {{ $json.company }}\\nLangue de l'offre : {{ $json.language }}\\n\\nDescription :\\n{{ $json.description.substring(0, 3000) }}\\n\\n## CV ACTUEL (Résumé)\\n{{ $json.language === 'en' ? 'Dynamic web developer with 2 years of solid experience in web application development, including Frontend technologies such as Angular and Vue.js, as well as Backend with NestJS and Python. Expert in relational databases and version control with GitLab, with a DevOps specialization.' : 'Dynamique developpeur web avec une solide experience de 2 ans dans le developpement d applications web, comprenant les technologies Frontend comme Angular et Vue.js ainsi que le Backend avec NestJS et Python. Expert en bases de donnees relationnelles et gestion de version sur GitLab, ainsi qu une specialisation DevOps.' }}\\n\\n## COMPÉTENCES\\nLangages : Java, Python, PHP, TypeScript, JavaScript\\nFrontend : Angular, React, Vue.js, Next.js\\nBackend : Symfony, Node.js, NestJS\\nBDD : MySQL, PostgreSQL, Redis, Elasticsearch\\nDevOps : Docker, GitLab, GitHub, RabbitMQ\\n\\n## TÂCHES\\n1. Rédige un nouveau résumé/accroche CV adapté à CETTE offre (3-4 phrases max), en {{ $json.language === 'en' ? 'anglais' : 'français' }}. Mets en avant les compétences les plus pertinentes pour CE poste spécifiquement.\\n2. Rédige une lettre de motivation courte (5-6 phrases max) pour ce poste, en {{ $json.language === 'en' ? 'anglais' : 'français' }}.\\n\\nRéponds UNIQUEMENT en JSON valide avec cette structure :\\n{\\\"adapted_resume\\\": \\\"...\\\", \\\"cover_note\\\": \\\"...\\\"}\"\n    }\n  ]\n}",
-        "options": { "timeout": 60000, "response": { "response": { "responseFormat": "json" } } }
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"max_tokens\": 2000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Tu es un expert en recrutement. Voici une offre d'emploi et le CV de Theo Lambert.\\n\\n## OFFRE D'EMPLOI\\nPoste : {{ $json.title }}\\nEntreprise : {{ $json.company }}\\nLangue de l'offre : {{ $json.language }}\\n\\nDescription :\\n{{ $json.description_text }}\\n\\n## CV ACTUEL (Résumé)\\n{{ $json.language === 'en' ? 'Dynamic web developer with 2 years of solid experience in web application development, including Frontend technologies such as Angular and Vue.js, as well as Backend with NestJS and Python. Expert in relational databases and version control with GitLab, with a DevOps specialization.' : 'Dynamique developpeur web avec une solide experience de 2 ans dans le developpement d applications web, comprenant les technologies Frontend comme Angular et Vue.js ainsi que le Backend avec NestJS et Python. Expert en bases de donnees relationnelles et gestion de version sur GitLab, ainsi qu une specialisation DevOps.' }}\\n\\n## COMPETENCES\\nLangages : Java, Python, PHP, TypeScript, JavaScript\\nFrontend : Angular, React, Vue.js, Next.js\\nBackend : Symfony, Node.js, NestJS\\nBDD : MySQL, PostgreSQL, Redis, Elasticsearch\\nDevOps : Docker, GitLab, GitHub, RabbitMQ\\n\\n## TACHES\\n1. Redige un nouveau resume/accroche CV adapte a CETTE offre (3-4 phrases max), en {{ $json.language === 'en' ? 'anglais' : 'francais' }}. Mets en avant les competences les plus pertinentes pour CE poste.\\n2. Redige une lettre de motivation courte (5-6 phrases max) pour ce poste, en {{ $json.language === 'en' ? 'anglais' : 'francais' }}.\\n\\nReponds UNIQUEMENT en JSON valide avec cette structure :\\n{\\\"adapted_resume\\\": \\\"...\\\", \\\"cover_note\\\": \\\"...\\\"}\"\n    }\n  ]\n}",
+        "options": { "timeout": 30000, "response": { "response": { "responseFormat": "json" } } }
       },
       "id": "claude-adapt-cv",
       "name": "Claude - Adapter CV",
@@ -82,21 +81,15 @@
         "assignments": {
           "assignments": [
             {
-              "id": "parse-claude",
-              "name": "claude_response",
-              "value": "={{ JSON.parse($json.content[0].text) }}",
-              "type": "object"
-            },
-            {
               "id": "adapted-resume",
               "name": "adapted_resume",
-              "value": "={{ JSON.parse($json.content[0].text).adapted_resume }}",
+              "value": "={{ JSON.parse($json.choices[0].message.content).adapted_resume }}",
               "type": "string"
             },
             {
               "id": "cover-note",
               "name": "cover_note",
-              "value": "={{ JSON.parse($json.content[0].text).cover_note }}",
+              "value": "={{ JSON.parse($json.choices[0].message.content).cover_note }}",
               "type": "string"
             }
           ]
@@ -205,18 +198,17 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            { "name": "Authorization", "value": "=Bearer {{ $env.GROQ_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1500,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Voici les champs d'un formulaire de candidature externe. Pour chaque champ, détermine la valeur à remplir en te basant sur les infos du candidat Theo Lambert.\\n\\nINFOS CANDIDAT :\\n- Prénom: Theo, Nom: Lambert\\n- Email: lambertheo@gmail.com\\n- Téléphone: 0673783010\\n- Localisation: Saint-Brieuc, France\\n- Expérience: 2 ans développeur web\\n- LinkedIn: https://linkedin.com/in/theo-lambert-601021f1a0/\\n- GitHub: https://github.com/Analogium\\n- Portfolio: https://theolambert.dev\\n- Disponible: sous 1 mois\\n- Salaire souhaité: 38000 EUR\\n\\nCHAMPS DU FORMULAIRE :\\n{{ JSON.stringify($json.fields) }}\\n\\nRéponds UNIQUEMENT en JSON valide :\\n{\\\"fields\\\": [{\\\"selector\\\": \\\"...\\\", \\\"label\\\": \\\"...\\\", \\\"value\\\": \\\"...\\\", \\\"tag\\\": \\\"...\\\", \\\"type\\\": \\\"...\\\"}]}\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"max_tokens\": 1500,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Voici les champs d'un formulaire de candidature externe. Pour chaque champ, détermine la valeur à remplir en te basant sur les infos du candidat Theo Lambert.\\n\\nINFOS CANDIDAT :\\n- Prénom: Theo, Nom: Lambert\\n- Email: lambertheo@gmail.com\\n- Téléphone: 0673783010\\n- Localisation: Saint-Brieuc, France\\n- Expérience: 2 ans développeur web\\n- LinkedIn: https://linkedin.com/in/theo-lambert-601021f1a0/\\n- GitHub: https://github.com/Analogium\\n- Portfolio: https://theolambert.dev\\n- Disponible: sous 1 mois\\n- Salaire souhaité: 38000 EUR\\n\\nCHAMPS DU FORMULAIRE :\\n{{ JSON.stringify($json.fields) }}\\n\\nRéponds UNIQUEMENT en JSON valide :\\n{\\\"fields\\\": [{\\\"selector\\\": \\\"...\\\", \\\"label\\\": \\\"...\\\", \\\"value\\\": \\\"...\\\", \\\"tag\\\": \\\"...\\\", \\\"type\\\": \\\"...\\\"}]}\"\n    }\n  ]\n}",
         "options": { "timeout": 30000, "response": { "response": { "responseFormat": "json" } } }
       },
       "id": "claude-fill-form",
