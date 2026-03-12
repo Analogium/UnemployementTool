@@ -24,9 +24,8 @@
             { "name": "job_url", "value": "={{ $json.body.job_url }}" }
           ]
         },
-        "options": { "timeout": 90000, "response": { "response": { "responseFormat": "json" } } }
+        "options": { "timeout": 150000, "response": { "response": { "responseFormat": "json" } } }
       },
-      "onError": "continueErrorOutput",
       "id": "get-job-details",
       "name": "Récupérer description",
       "type": "n8n-nodes-base.httpRequest",
