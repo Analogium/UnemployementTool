@@ -16,20 +16,24 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            { "id": "desc", "name": "description_text", "value": "={{ $json.body.title + ' chez ' + $json.body.company }}", "type": "string" },
-            { "id": "lang", "name": "language", "value": "fr", "type": "string" },
-            { "id": "ext_url", "name": "external_apply_url", "value": "", "type": "string" },
-            { "id": "atype", "name": "apply_type", "value": "={{ $json.body.apply_type }}", "type": "string" }
+        "method": "POST",
+        "url": "http://puppeteer-service:3000/linkedin/job-details",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "job_url", "value": "={{ $json.body.job_url }}" }
           ]
         },
-        "options": {}
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
       },
       "id": "get-job-details",
       "name": "Récupérer description",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "continueOnFail": true,
       "position": [460, 400]
     },
     {
@@ -40,10 +44,10 @@
             { "id": "job_url", "name": "job_url", "value": "={{ $('Webhook déclencheur').item.json.body.job_url }}", "type": "string" },
             { "id": "title", "name": "title", "value": "={{ $('Webhook déclencheur').item.json.body.title }}", "type": "string" },
             { "id": "company", "name": "company", "value": "={{ $('Webhook déclencheur').item.json.body.company }}", "type": "string" },
-            { "id": "apply_type", "name": "apply_type", "value": "={{ $('Webhook déclencheur').item.json.body.apply_type }}", "type": "string" },
-            { "id": "description", "name": "description", "value": "={{ $json.description_text }}", "type": "string" },
-            { "id": "language", "name": "language", "value": "={{ $json.language }}", "type": "string" },
-            { "id": "external_apply_url", "name": "external_apply_url", "value": "={{ $json.external_apply_url }}", "type": "string" }
+            { "id": "apply_type", "name": "apply_type", "value": "={{ $json.apply_type || $('Webhook déclencheur').item.json.body.apply_type }}", "type": "string" },
+            { "id": "description", "name": "description", "value": "={{ $json.description_text || ($('Webhook déclencheur').item.json.body.title + ' chez ' + $('Webhook déclencheur').item.json.body.company) }}", "type": "string" },
+            { "id": "language", "name": "language", "value": "={{ $json.language || 'fr' }}", "type": "string" },
+            { "id": "external_apply_url", "name": "external_apply_url", "value": "={{ $json.external_apply_url || '' }}", "type": "string" }
           ]
         },
         "options": {}
@@ -67,7 +71,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"max_tokens\": 2000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Tu es un expert en recrutement. Voici une offre d'emploi et le CV de Theo Lambert.\\n\\n## OFFRE D'EMPLOI\\nPoste : {{ $json.title }}\\nEntreprise : {{ $json.company }}\\nLangue de l'offre : {{ $json.language }}\\n\\nDescription :\\n{{ $json.description_text }}\\n\\n## CV ACTUEL (Résumé)\\n{{ $json.language === 'en' ? 'Dynamic web developer with 2 years of solid experience in web application development, including Frontend technologies such as Angular and Vue.js, as well as Backend with NestJS and Python. Expert in relational databases and version control with GitLab, with a DevOps specialization.' : 'Dynamique developpeur web avec une solide experience de 2 ans dans le developpement d applications web, comprenant les technologies Frontend comme Angular et Vue.js ainsi que le Backend avec NestJS et Python. Expert en bases de donnees relationnelles et gestion de version sur GitLab, ainsi qu une specialisation DevOps.' }}\\n\\n## COMPETENCES\\nLangages : Java, Python, PHP, TypeScript, JavaScript\\nFrontend : Angular, React, Vue.js, Next.js\\nBackend : Symfony, Node.js, NestJS\\nBDD : MySQL, PostgreSQL, Redis, Elasticsearch\\nDevOps : Docker, GitLab, GitHub, RabbitMQ\\n\\n## TACHES\\n1. Redige un nouveau resume/accroche CV adapte a CETTE offre (3-4 phrases max), en {{ $json.language === 'en' ? 'anglais' : 'francais' }}. Mets en avant les competences les plus pertinentes pour CE poste.\\n2. Redige une lettre de motivation courte (5-6 phrases max) pour ce poste, en {{ $json.language === 'en' ? 'anglais' : 'francais' }}.\\n\\nReponds UNIQUEMENT en JSON valide avec cette structure :\\n{\\\"adapted_resume\\\": \\\"...\\\", \\\"cover_note\\\": \\\"...\\\"}\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"max_tokens\": 2000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Tu es un expert en recrutement. Voici une offre d'emploi et le CV de Theo Lambert.\\n\\n## OFFRE D'EMPLOI\\nPoste : {{ $json.title }}\\nEntreprise : {{ $json.company }}\\nLangue de l'offre : {{ $json.language }}\\n\\nDescription :\\n{{ $json.description }}\\n\\n## CV ACTUEL (Résumé)\\n{{ $json.language === 'en' ? 'Dynamic web developer with 2 years of solid experience in web application development, including Frontend technologies such as Angular and Vue.js, as well as Backend with NestJS and Python. Expert in relational databases and version control with GitLab, with a DevOps specialization.' : 'Dynamique developpeur web avec une solide experience de 2 ans dans le developpement d applications web, comprenant les technologies Frontend comme Angular et Vue.js ainsi que le Backend avec NestJS et Python. Expert en bases de donnees relationnelles et gestion de version sur GitLab, ainsi qu une specialisation DevOps.' }}\\n\\n## COMPETENCES\\nLangages : Java, Python, PHP, TypeScript, JavaScript\\nFrontend : Angular, React, Vue.js, Next.js\\nBackend : Symfony, Node.js, NestJS\\nBDD : MySQL, PostgreSQL, Redis, Elasticsearch\\nDevOps : Docker, GitLab, GitHub, RabbitMQ\\n\\n## TACHES\\n1. Redige un nouveau resume/accroche CV adapte a CETTE offre (3-4 phrases max), en {{ $json.language === 'en' ? 'anglais' : 'francais' }}. Mets en avant les competences les plus pertinentes pour CE poste.\\n2. Redige une lettre de motivation courte (5-6 phrases max) pour ce poste, en {{ $json.language === 'en' ? 'anglais' : 'francais' }}.\\n\\nReponds UNIQUEMENT en JSON valide avec cette structure :\\n{\\\"adapted_resume\\\": \\\"...\\\", \\\"cover_note\\\": \\\"...\\\"}\"\n    }\n  ]\n}",
         "options": { "timeout": 30000, "response": { "response": { "responseFormat": "json" } } }
       },
       "id": "claude-adapt-cv",
@@ -225,7 +229,7 @@
         "url": "http://puppeteer-service:3000/linkedin/external-apply",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  external_url: $('Fusionner données').item.json.external_apply_url,\n  job_title: $('Fusionner données').item.json.title,\n  company: $('Fusionner données').item.json.company,\n  cv_pdf_base64: $('Générer PDF').item.binary?.data?.toString('base64') || '',\n  cover_note: $('Parser réponse Claude').item.json.cover_note,\n  form_analysis: JSON.parse($json.content[0].text)\n}) }}",
+        "jsonBody": "={{ JSON.stringify({\n  external_url: $('Fusionner données').item.json.external_apply_url,\n  job_title: $('Fusionner données').item.json.title,\n  company: $('Fusionner données').item.json.company,\n  cv_pdf_base64: $('Générer PDF').item.binary?.data?.toString('base64') || '',\n  cover_note: $('Parser réponse Claude').item.json.cover_note,\n  form_analysis: JSON.parse($json.choices[0].message.content)\n}) }}",
         "options": { "timeout": 120000, "response": { "response": { "responseFormat": "json" } } }
       },
       "id": "external-apply",
